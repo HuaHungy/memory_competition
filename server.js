@@ -39,8 +39,11 @@ app.post('/api/polish', async (req, res) => {
         res.json({
             success: true,
             polishedText: polishedResult.polished,
-            mood: polishedResult.mood,
-            moodDescription: polishedResult.moodDescription
+            moodAnalysis: {
+                mood: polishedResult.mood,
+                description: polishedResult.moodDescription,
+                emoji: getMoodEmoji(polishedResult.mood)
+            }
         });
         
     } catch (error) {
@@ -55,7 +58,7 @@ app.post('/api/polish', async (req, res) => {
 // 图片生成API
 app.post('/api/generate-image', async (req, res) => {
     try {
-        const { text, mood } = req.body;
+        const { text, mood, prefer } = req.body; // prefer: 'ai' | 'auto'
         
         if (!text || text.trim().length === 0) {
             return res.status(400).json({
@@ -65,11 +68,11 @@ app.post('/api/generate-image', async (req, res) => {
         }
 
         // 模拟图片生成处理
-        const images = await generateImages(text, mood);
+        const result = await generateImages(text, mood, prefer);
         
         res.json({
             success: true,
-            images: images
+            images: result.images || result
         });
         
     } catch (error) {
@@ -90,9 +93,36 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// 主页路由
+// 主页路由：返回说明页，指引使用前端 Vite 服务
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.end(`
+      <!doctype html>
+      <html lang="zh-CN">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>Memory 后端服务</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; padding: 32px; color: #333; }
+            code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
+            a { color: #5c6ac4; text-decoration: none; }
+            h1 { margin: 0 0 12px; font-size: 20px; }
+            ul { line-height: 1.7; }
+          </style>
+        </head>
+        <body>
+          <h1>✅ 后端服务运行中</h1>
+          <p>这是 Memory 应用的后端（端口 <code>${PORT}</code>）。前端为独立的 Vite 项目，请按如下方式访问与配置：</p>
+          <ul>
+            <li>前端开发地址：<code>http://localhost:3001</code>（在 <code>vue/</code> 目录运行 <code>npm run dev</code>）</li>
+            <li>后端健康检查：<a href="/api/health">/api/health</a></li>
+            <li>前端可通过环境变量 <code>VITE_API_BASE_URL</code> 指向本服务，例如：<code>http://localhost:${PORT}</code></li>
+            <li>要启用真实 AI 效果，请在根目录创建 <code>.env</code> 并配置 API Key（智谱/通义/PEXELS/百度）。</li>
+          </ul>
+        </body>
+      </html>
+    `);
 });
 
 // 真实的文本润色功能（使用国内免费AI服务）
@@ -154,7 +184,7 @@ async function polishTextWithZhipu(text) {
       messages: [
         {
           role: "system",
-          content: "你是一个专业的文本润色助手。请帮助用户润色和改进他们的文本，使其更加优美、生动、有感情色彩。同时分析文本的情感基调。请用中文回复。"
+          content: "你是一位具有诗意灵魂的中文文学润色师。请将以下文本打磨得更加优美细腻、饱含情感与画面感，让读者能从字里行间感受到情绪的波动与温度。你可以适度扩写，增加内心描写、氛围刻画与意象铺陈，使整体文字更具文学美感与情绪深度。用中文回答，不少于200字"
         },
         {
           role: "user",
@@ -286,6 +316,22 @@ function getMoodDescription(mood) {
     return moodDescriptions[mood] || '温暖美好的情感';
 }
 
+// 获取情感对应的emoji
+function getMoodEmoji(mood) {
+    const moodEmojis = {
+        '温馨': '🏠',
+        '怀念': '💭',
+        '快乐': '😊',
+        '宁静': '🌸',
+        '感动': '💖',
+        '希望': '🌟',
+        '忧伤': '🌧️',
+        '激动': '🎉'
+    };
+    
+    return moodEmojis[mood] || '💝';
+}
+
 // 分析文本情感
 function analyzeMoodFromText(text) {
     const moodKeywords = {
@@ -358,35 +404,35 @@ function polishTextBasic(text) {
     };
 }
 // 真实的图片生成功能（使用多种AI服务）
-async function generateImages(text, mood) {
+async function generateImages(text, mood, prefer = 'auto') {
   try {
-    // 优先使用Pexels免费图片API
-    if (process.env.PEXELS_API_KEY && process.env.PEXELS_API_KEY !== 'your_pexels_api_key_here') {
-      console.log('🖼️ 优先使用Pexels图片服务...');
-      return await generateImagesWithPexels(text, mood);
-    } else {
-      console.log('Pexels API密钥未正确配置，尝试其他服务');
-    }
-    
-    // 备选：使用百度文心一格 AI图片生成
-    if (process.env.BAIDU_API_KEY && 
-        process.env.BAIDU_SECRET_KEY &&
-        process.env.BAIDU_API_KEY !== 'your_baidu_api_key_here' &&
-        process.env.BAIDU_SECRET_KEY !== 'your_baidu_secret_key_here') {
-      console.log('🎨 使用百度文心一格生成图片...');
-      return await generateImagesWithBaidu(text, mood);
-    } else {
-      console.log('百度文心一格 API密钥未正确配置，跳过AI图片生成');
-    }
-    
-    // 备选：使用阿里云通义万相
-    if (process.env.DASHSCOPE_API_KEY && 
-        process.env.DASHSCOPE_API_KEY !== 'your_dashscope_api_key_here' &&
-        process.env.DASHSCOPE_API_KEY.startsWith('sk-')) {
-      console.log('🎯 使用阿里云通义万相生成图片...');
+    const hasDashScope = !!(process.env.DASHSCOPE_API_KEY && process.env.DASHSCOPE_API_KEY !== 'your_dashscope_api_key_here' && process.env.DASHSCOPE_API_KEY.startsWith('sk-'));
+    const hasPexels = !!(process.env.PEXELS_API_KEY && process.env.PEXELS_API_KEY !== 'your_pexels_api_key_here');
+    const hasBaidu = !!(process.env.BAIDU_API_KEY && process.env.BAIDU_SECRET_KEY && process.env.BAIDU_API_KEY !== 'your_baidu_api_key_here' && process.env.BAIDU_SECRET_KEY !== 'your_baidu_secret_key_here');
+
+    console.log('图片生成偏好:', prefer);
+    console.log('可用服务 → 通义:', hasDashScope, ' Pexels:', hasPexels, ' 百度:', hasBaidu);
+
+    // 当用户显式偏好 AI 且通义可用时，优先通义
+    if (prefer === 'ai' && hasDashScope) {
+      console.log('🎯 偏好AI，优先使用阿里云通义万相');
       return await generateImagesWithDashScope(text, mood);
-    } else {
-      console.log('阿里云通义万相 API密钥未正确配置，跳过AI图片生成');
+    }
+
+    // 默认优先顺序：Pexels（真实图片，易通过）→ 通义万相 → 百度
+    if (hasPexels) {
+      console.log('🖼️ 使用 Pexels 图片服务');
+      return await generateImagesWithPexels(text, mood);
+    }
+
+    if (hasDashScope) {
+      console.log('🎯 使用阿里云通义万相生成图片');
+      return await generateImagesWithDashScope(text, mood);
+    }
+
+    if (hasBaidu) {
+      console.log('🎨 使用百度文心一格生成图片');
+      return await generateImagesWithBaidu(text, mood);
     }
     
     // 最终回退到模拟数据
@@ -508,7 +554,7 @@ async function generateImagesWithDashScope(text, mood) {
   };
   
   const basePrompt = moodPrompts[mood] || '美丽宁静的场景';
-  const prompt = `${basePrompt}，高质量，细节丰富，艺术风格`;
+  const prompt = `根据以下中文记忆文本进行画面创作：${text}。${basePrompt}，高质量，细节丰富，光影自然，构图完整，色彩和谐，避免畸变与多余手指。`;
   
   try {
     console.log('使用阿里云通义万相生成图片...');
@@ -759,12 +805,7 @@ function generateImagesMock(text, mood) {
         source: '模拟数据'
     }));
     
-    return {
-        images: images,
-        mood: mood,
-        timestamp: new Date().toISOString(),
-        source: '模拟数据'
-    };
+    return images;
 }
 
 // 错误处理中间件
