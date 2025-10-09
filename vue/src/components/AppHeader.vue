@@ -1,7 +1,7 @@
 <template>
   <header class="header">
     <h1 class="title">
-      记忆回忆
+      拾光记忆
     </h1>
     <p class="subtitle">记录美好时光，润色珍贵回忆</p>
   </header>
@@ -18,13 +18,19 @@ export default {
   text-align: center;
   margin-bottom: 40px;
   padding: 30px 20px;
+  background-color: rgb(236,236,233);
+  width: 900px;
+  border-radius: 18px;
+  margin-left: 420px;
+  background-color: rgba(252,251,251, 0.4); /* 白色半透明背景 */
+  color: #000; 
 }
 
 .title {
   font-family: 'Dancing Script', cursive;
   font-size: 4rem;
   font-weight: bolder;
-  color:rgb(243,242,243);
+  color:rgb(255, 255, 255);
   margin-bottom: 10px;
   display: flex;
   align-items: center;

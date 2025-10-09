@@ -1,14 +1,12 @@
 import axios from 'axios'
 
-// API基础URL（可通过 VITE_API_BASE_URL 覆盖）
-const API_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_BASE_URL)
-  ? import.meta.env.VITE_API_BASE_URL
-  : 'http://localhost:3000'
+// API基础URL
+const API_BASE_URL = 'http://localhost:3000'
 
 // 创建axios实例
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 90000,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -75,10 +73,13 @@ export async function polishText(text) {
  * @param {string} text - 润色后的文本
  * @returns {Promise<Array>}
  */
-export async function generateImages(text) {
+export async function generateImages(text, mood, prefer = 'ai', count = 3) {
   try {
     const response = await apiClient.post('/api/generate-image', {
-      text: text.trim()
+      text: text.trim(),
+      mood,
+      prefer,
+      count
     })
     
     if (response.data.success) {

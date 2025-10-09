@@ -1,6 +1,6 @@
 <template>
   <footer class="footer">
-    <p> 记忆回忆 - 让每一个回忆都闪闪发光</p>
+    <p> 拾光记忆 - 让每一个回忆都闪闪发光</p>
   </footer>
 </template>
 

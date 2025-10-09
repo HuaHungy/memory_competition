@@ -111,7 +111,12 @@ export default {
       showImageResult.value = false
       
       try {
-        const images = await generateImages(polishedText.value)
+        const images = await generateImages(
+          polishedText.value,
+          moodAnalysis.value?.mood,
+          'ai',
+          3
+        )
         generatedImages.value = images
         showImageResult.value = true
         showNotification('记忆图片生成完成！', 'success')

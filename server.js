@@ -13,6 +13,11 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 通用提示词片段（统一质量与负面约束）
+const QUALITY_PROMPT = '温馨而充满回忆感的手绘插画，柔和的光线洒在画面中，色调温暖细腻，氛围安静而治愈。画面仿佛定格在一段珍贵的记忆中，让人感受到熟悉的温度与情感。主体清晰且富有故事感，线条柔和，色彩协调，光影自然。整体风格细腻、干净、具有高级的插画质感与温暖的情绪表达。';
+const NEGATIVE_PROMPT = '低质量, 模糊, 过曝, 噪点, 畸变, 透视错误, 过度锐化, 涂抹痕迹, 多余手指, 断肢, 文字, 水印, 标志, 拼贴感, 画面拥挤, 比例失衡, 面部扭曲, 伪影, 眩光';
+const ILLUSTRATION_STYLE_PROMPT = '温馨而充满回忆感的手绘插画，柔和的光线洒在画面中，色调温暖细腻，氛围安静而治愈。画面仿佛定格在一段珍贵的记忆中，让人感受到熟悉的温度与情感。主体清晰且富有故事感，线条柔和，色彩协调，光影自然。整体风格细腻、干净、具有高级的插画质感与温暖的情绪表达。';
+
 // 中间件配置
 app.use(cors());
 app.use(bodyParser.json());
@@ -58,7 +63,7 @@ app.post('/api/polish', async (req, res) => {
 // 图片生成API
 app.post('/api/generate-image', async (req, res) => {
     try {
-        const { text, mood, prefer } = req.body; // prefer: 'ai' | 'auto'
+        const { text, mood, count } = req.body;
         
         if (!text || text.trim().length === 0) {
             return res.status(400).json({
@@ -67,8 +72,8 @@ app.post('/api/generate-image', async (req, res) => {
             });
         }
 
-        // 模拟图片生成处理
-        const result = await generateImages(text, mood, prefer);
+        // 生成图片处理（仅生成式AI + 回退模拟）
+        const result = await generateImages(text, mood, Number(count) || 3);
         
         res.json({
             success: true,
@@ -93,36 +98,9 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// 主页路由：返回说明页，指引使用前端 Vite 服务
+// 主页路由
 app.get('/', (req, res) => {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.end(`
-      <!doctype html>
-      <html lang="zh-CN">
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Memory 后端服务</title>
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif; padding: 32px; color: #333; }
-            code { background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
-            a { color: #5c6ac4; text-decoration: none; }
-            h1 { margin: 0 0 12px; font-size: 20px; }
-            ul { line-height: 1.7; }
-          </style>
-        </head>
-        <body>
-          <h1>✅ 后端服务运行中</h1>
-          <p>这是 Memory 应用的后端（端口 <code>${PORT}</code>）。前端为独立的 Vite 项目，请按如下方式访问与配置：</p>
-          <ul>
-            <li>前端开发地址：<code>http://localhost:3001</code>（在 <code>vue/</code> 目录运行 <code>npm run dev</code>）</li>
-            <li>后端健康检查：<a href="/api/health">/api/health</a></li>
-            <li>前端可通过环境变量 <code>VITE_API_BASE_URL</code> 指向本服务，例如：<code>http://localhost:${PORT}</code></li>
-            <li>要启用真实 AI 效果，请在根目录创建 <code>.env</code> 并配置 API Key（智谱/通义/PEXELS/百度）。</li>
-          </ul>
-        </body>
-      </html>
-    `);
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // 真实的文本润色功能（使用国内免费AI服务）
@@ -184,14 +162,14 @@ async function polishTextWithZhipu(text) {
       messages: [
         {
           role: "system",
-          content: "你是一位具有诗意灵魂的中文文学润色师。请将以下文本打磨得更加优美细腻、饱含情感与画面感，让读者能从字里行间感受到情绪的波动与温度。你可以适度扩写，增加内心描写、氛围刻画与意象铺陈，使整体文字更具文学美感与情绪深度。用中文回答，不少于200字"
+          content: "你是一位具有诗意灵魂的中文文学润色师。请将以下文本打磨得更加优美细腻、饱含情感与画面感，让读者能从字里行间感受到情绪的波动与温度。你可以适度扩写，增加内心描写、氛围刻画与意象铺陈，使整体文字更具文学美感与情绪深度。必须严格按长度要求输出：润色正文不少于400字；情绪分析段落不少于200字。用中文回复。"
         },
         {
           role: "user",
-          content: `请润色以下文本，并分析其情感基调：\n\n${text}\n\n请按以下格式回复：\n润色后的文本：[润色后的内容]\n情感分析：[情感基调，如：温馨、怀念、快乐、忧伤等]`
+          content: `请润色以下文本，并分析其情感基调。要求：\n1) 润色后的正文不少于400字；\n2) 情绪分析为一段连贯文字，不少于200字；\n3) 语言自然细腻，有画面感。\n\n【待润色文本】\n${text}\n\n请严格按以下格式输出：\n润色后的文本：[正文，不少于400字]\n情感分析：[不少于200字，包含情绪关键词（如温馨/怀念/快乐等）与简短理由]`
         }
       ],
-      max_tokens: 300,
+      max_tokens: 1200,
       temperature: 0.7,
       top_p: 0.7  // 显式设置top_p参数，必须在(0.0, 1.0)开区间内
     }, {
@@ -246,16 +224,16 @@ async function polishTextWithDashScope(text) {
         messages: [
           {
             role: "system",
-            content: "你是一个专业的文本润色助手。请帮助用户润色和改进他们的文本，使其更加优美、生动、有感情色彩。同时分析文本的情感基调。请用中文回复。"
+            content: "你是专业的中文文本润色助手。请润色文本并输出情绪分析。必须严格满足：润色正文不少于400字；情绪分析段落不少于200字。"
           },
           {
             role: "user",
-            content: `请润色以下文本，并分析其情感基调：\n\n${text}\n\n请按以下格式回复：\n润色后的文本：[润色后的内容]\n情感分析：[情感基调，如：温馨、怀念、快乐、忧伤等]`
+            content: `请润色以下文本，并分析其情感基调。要求：\n1) 润色后的正文不少于400字；\n2) 情绪分析为一段连贯文字，不少于200字；\n3) 语言自然细腻，有画面感。\n\n【待润色文本】\n${text}\n\n请严格按以下格式输出：\n润色后的文本：[正文，不少于400字]\n情感分析：[不少于200字，包含情绪关键词（如温馨/怀念/快乐等）与简短理由]`
           }
         ]
       },
       parameters: {
-        max_tokens: 300,
+        max_tokens: 1200,
         temperature: 0.7
       }
     }, {
@@ -403,51 +381,43 @@ function polishTextBasic(text) {
         source: '基础润色'
     };
 }
-// 真实的图片生成功能（使用多种AI服务）
-async function generateImages(text, mood, prefer = 'auto') {
+// 真实的图片生成功能（仅生成式AI + 回退模拟）
+async function generateImages(text, mood, count = 3) {
   try {
-    const hasDashScope = !!(process.env.DASHSCOPE_API_KEY && process.env.DASHSCOPE_API_KEY !== 'your_dashscope_api_key_here' && process.env.DASHSCOPE_API_KEY.startsWith('sk-'));
-    const hasPexels = !!(process.env.PEXELS_API_KEY && process.env.PEXELS_API_KEY !== 'your_pexels_api_key_here');
-    const hasBaidu = !!(process.env.BAIDU_API_KEY && process.env.BAIDU_SECRET_KEY && process.env.BAIDU_API_KEY !== 'your_baidu_api_key_here' && process.env.BAIDU_SECRET_KEY !== 'your_baidu_secret_key_here');
-
-    console.log('图片生成偏好:', prefer);
-    console.log('可用服务 → 通义:', hasDashScope, ' Pexels:', hasPexels, ' 百度:', hasBaidu);
-
-    // 当用户显式偏好 AI 且通义可用时，优先通义
-    if (prefer === 'ai' && hasDashScope) {
-      console.log('🎯 偏好AI，优先使用阿里云通义万相');
-      return await generateImagesWithDashScope(text, mood);
+    // 优先：阿里云通义万相（生成式）
+    if (process.env.DASHSCOPE_API_KEY && 
+        process.env.DASHSCOPE_API_KEY !== 'your_dashscope_api_key_here' &&
+        process.env.DASHSCOPE_API_KEY.startsWith('sk-')) {
+      console.log('🎯 使用阿里云通义万相生成图片...');
+      return await generateImagesWithDashScope(text, mood, count);
+    } else {
+      console.log('阿里云通义万相 API密钥未正确配置');
     }
 
-    // 默认优先顺序：Pexels（真实图片，易通过）→ 通义万相 → 百度
-    if (hasPexels) {
-      console.log('🖼️ 使用 Pexels 图片服务');
-      return await generateImagesWithPexels(text, mood);
+    // 次选：百度文心一格（生成式）
+    if (process.env.BAIDU_API_KEY && 
+        process.env.BAIDU_SECRET_KEY &&
+        process.env.BAIDU_API_KEY !== 'your_baidu_api_key_here' &&
+        process.env.BAIDU_SECRET_KEY !== 'your_baidu_secret_key_here') {
+      console.log('🎨 使用百度文心一格生成图片...');
+      return await generateImagesWithBaidu(text, mood, count);
+    } else {
+      console.log('百度文心一格 API密钥未正确配置');
     }
 
-    if (hasDashScope) {
-      console.log('🎯 使用阿里云通义万相生成图片');
-      return await generateImagesWithDashScope(text, mood);
-    }
+    // 回退：模拟数据
+    console.log('📷 所有生成式图片服务都未配置或不可用，使用模拟数据');
+    return generateImagesMock(text, mood, count);
 
-    if (hasBaidu) {
-      console.log('🎨 使用百度文心一格生成图片');
-      return await generateImagesWithBaidu(text, mood);
-    }
-    
-    // 最终回退到模拟数据
-    console.log('📷 所有图片服务都未配置，使用模拟数据');
-    return generateImagesMock(text, mood);
-    
   } catch (error) {
     console.error('图片生成失败:', error.message);
     console.log('📷 回退到模拟数据');
-    return generateImagesMock(text, mood);
+    return generateImagesMock(text, mood, count);
   }
 }
 
 // 使用百度文心一格生成图片
-async function generateImagesWithBaidu(text, mood) {
+async function generateImagesWithBaidu(text, mood, count = 3) {
   const moodPrompts = {
     '温馨': '温馨的家庭场景，柔和的灯光，舒适的家居氛围',
     '怀念': '怀旧复古场景，老照片风格，回忆的色调',
@@ -458,7 +428,10 @@ async function generateImagesWithBaidu(text, mood) {
   };
   
   const basePrompt = moodPrompts[mood] || '美丽宁静的场景';
-  const prompt = `${basePrompt}，高质量，细节丰富，艺术风格`;
+  // 将用户文本强制融合，给出明确的画面控制与负面约束
+  // 插画风模板：用户文本 + 情感基调 + 插画风格强化 + 质量约束
+  const prompt = `根据以下中文描述进行画面创作：${text}。${basePrompt}。${ILLUSTRATION_STYLE_PROMPT} ${QUALITY_PROMPT}`;
+  const negativePrompt = NEGATIVE_PROMPT;
   
   try {
     console.log('使用百度文心一格生成图片...');
@@ -470,9 +443,9 @@ async function generateImagesWithBaidu(text, mood) {
       `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/text2image/sd_xl?access_token=${accessToken}`,
       {
         prompt: prompt,
-        negative_prompt: '模糊，低质量，扭曲，丑陋',
+        negative_prompt: negativePrompt,
         size: '512x512',
-        n: 1,
+        n: Math.max(1, Math.min(4, count)),
         steps: 20,
         sampler_index: 'Euler a'
       },
@@ -488,12 +461,13 @@ async function generateImagesWithBaidu(text, mood) {
       const imageData = response.data.data[0];
       console.log('百度文心一格图片生成成功');
       
+      const images = response.data.data.map((img) => ({
+        url: `data:image/png;base64,${img.b64_image}`,
+        description: `AI生成图片：${prompt}`,
+        source: '百度文心一格'
+      }));
       return {
-        images: [{
-          url: `data:image/png;base64,${imageData.b64_image}`,
-          description: `AI生成图片：${prompt}`,
-          source: '百度文心一格'
-        }],
+        images: images,
         mood: mood,
         timestamp: new Date().toISOString(),
         source: '百度文心一格'
@@ -543,7 +517,7 @@ async function getBaiduAccessToken() {
 }
 
 // 使用阿里云通义万相生成图片
-async function generateImagesWithDashScope(text, mood) {
+async function generateImagesWithDashScope(text, mood, count = 3) {
   const moodPrompts = {
     '温馨': '温馨的家庭场景，柔和的灯光，舒适的家居氛围',
     '怀念': '怀旧复古场景，老照片风格，回忆的色调',
@@ -554,7 +528,9 @@ async function generateImagesWithDashScope(text, mood) {
   };
   
   const basePrompt = moodPrompts[mood] || '美丽宁静的场景';
-  const prompt = `根据以下中文记忆文本进行画面创作：${text}。${basePrompt}，高质量，细节丰富，光影自然，构图完整，色彩和谐，避免畸变与多余手指。`;
+  // 插画风模板：用户文本 + 情感基调 + 插画风格强化 + 质量约束
+  const prompt = `根据以下中文描述进行画面创作：${text}。${basePrompt}。${ILLUSTRATION_STYLE_PROMPT} ${QUALITY_PROMPT}`;
+  const negativePrompt = NEGATIVE_PROMPT;
   
   try {
     console.log('使用阿里云通义万相生成图片...');
@@ -567,12 +543,13 @@ async function generateImagesWithDashScope(text, mood) {
         model: 'wanx-v1',
         input: {
           prompt: prompt,
-          negative_prompt: '模糊，低质量，扭曲，丑陋'
+          negative_prompt: negativePrompt
         },
         parameters: {
           style: '<auto>',
           size: '1024*1024',
-          n: 1
+          n: Math.max(1, Math.min(4, count)),
+          seed: Math.floor(Math.random() * 1e9) // 增加随机性
         }
       },
       {
@@ -591,15 +568,14 @@ async function generateImagesWithDashScope(text, mood) {
       // 通义万相是异步生成，需要轮询结果
       const taskId = response.data.output.task_id;
       console.log('任务ID:', taskId);
-      const imageResult = await pollDashScopeImageResult(taskId);
-      
+      const imageResults = await pollDashScopeImageResult(taskId);
       console.log('阿里云通义万相图片生成成功');
       return {
-        images: [{
-          url: imageResult.url,
+        images: imageResults.map(r => ({
+          url: r.url,
           description: `AI生成图片：${prompt}`,
           source: '阿里云通义万相'
-        }],
+        })),
         mood: mood,
         timestamp: new Date().toISOString(),
         source: '阿里云通义万相'
@@ -656,11 +632,8 @@ async function pollDashScopeImageResult(taskId, maxAttempts = 15) {
         if (status === 'SUCCEEDED') {
           const results = response.data.output.results;
           if (results && results.length > 0) {
-            console.log('图片生成成功，URL:', results[0].url);
-            return {
-              url: results[0].url,
-              description: '通义万相生成的图片'
-            };
+            console.log('图片生成成功，数量:', results.length);
+            return results.map(r => ({ url: r.url }));
           } else {
             throw new Error('任务成功但未返回图片结果');
           }
@@ -694,82 +667,7 @@ async function pollDashScopeImageResult(taskId, maxAttempts = 15) {
   throw new Error('图片生成超时，请稍后重试');
 }
 
-// 使用Pexels API获取相关图片
-async function generateImagesWithPexels(text, mood) {
-  // 根据情感映射搜索关键词
-  const moodKeywords = {
-    '温馨': ['family', 'home', 'cozy', 'warm', 'comfort', 'love'],
-    '怀念': ['vintage', 'old', 'memories', 'nostalgic', 'retro', 'past'],
-    '快乐': ['happy', 'joy', 'celebration', 'smile', 'fun', 'cheerful'],
-    '宁静': ['peaceful', 'calm', 'nature', 'serene', 'quiet', 'tranquil'],
-    '感动': ['emotional', 'touching', 'heartwarming', 'tender', 'moving'],
-    '希望': ['hope', 'bright', 'future', 'sunrise', 'light', 'optimistic']
-  };
-  
-  // 选择搜索关键词
-  const keywords = moodKeywords[mood] || moodKeywords['温馨'];
-  const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
-  
-  try {
-    console.log(`使用Pexels搜索图片，关键词: ${randomKeyword}`);
-    
-    const response = await axios.get('https://api.pexels.com/v1/search', {
-      params: {
-        query: randomKeyword,
-        per_page: 3,
-        page: Math.floor(Math.random() * 10) + 1, // 随机页面，增加图片多样性
-        orientation: 'landscape', // 横向图片更适合展示
-        size: 'medium'
-      },
-      headers: {
-        'Authorization': process.env.PEXELS_API_KEY
-      },
-      timeout: 10000
-    });
-    
-    if (response.data && response.data.photos && response.data.photos.length > 0) {
-      const images = response.data.photos.map((photo, index) => ({
-        url: photo.src.medium, // 使用中等尺寸图片
-        description: `${mood}主题图片 - ${photo.alt || '精美图片'}`,
-        source: 'Pexels',
-        photographer: photo.photographer,
-        photographer_url: photo.photographer_url
-      }));
-      
-      console.log(`Pexels图片获取成功，共${images.length}张`);
-      
-      return {
-        images: images,
-        mood: mood,
-        timestamp: new Date().toISOString(),
-        source: 'Pexels',
-        keyword: randomKeyword
-      };
-    } else {
-      throw new Error('Pexels API未返回图片数据');
-    }
-    
-  } catch (error) {
-    console.error('Pexels API调用失败:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data
-    });
-    
-    // 如果API调用失败，提供详细错误信息
-    if (error.response?.status === 401) {
-      console.error('❌ Pexels API密钥认证失败');
-      console.error('请检查 .env 文件中的 PEXELS_API_KEY 配置');
-      console.error('获取API密钥: https://www.pexels.com/api/');
-    } else if (error.response?.status === 429) {
-      console.error('❌ Pexels API请求频率超限');
-      console.error('免费账户每月限制200次请求，请稍后重试');
-    }
-    
-    throw error;
-  }
-}
+// 已移除 Pexels 通道
 
 // 模拟图片生成（回退选项）
 function generateImagesMock(text, mood) {

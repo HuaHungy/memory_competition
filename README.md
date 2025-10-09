@@ -49,28 +49,13 @@ STABILITY_API_KEY=your_stability_api_key_here
 
 **注意：** 如果不配置API密钥，程序会自动使用模拟数据，功能完全正常！
 
-### 3. 启动服务（前后端分别启动）
-后端（端口 3000）：
+### 3. 启动服务
 ```bash
 npm start
 ```
 
-前端（端口 3001）：
-```bash
-cd vue
-npm install
-npm run dev
-```
-
-可选：在前端设置 API 基址（若后端端口有变动）
-在 `vue/.env` 写入：
-```env
-VITE_API_BASE_URL=http://localhost:3000
-```
-
 ### 4. 访问应用
-- 前端开发地址： http://localhost:3001
-- 后端健康检查： http://localhost:3000/api/health
+打开浏览器访问：http://localhost:3000
 
 ## 📖 使用指南
 
@@ -123,36 +108,15 @@ memory-recall-app/
 ## 🔄 AI功能说明
 
 ### 文本润色功能
-- **真实模式**：优先使用智谱（GLM）→ 通义千问；需在根目录 `.env` 配置 `ZHIPU_API_KEY` 或 `DASHSCOPE_API_KEY`
-- **模拟模式**：使用本地智能/基础润色
-- **自动降级**：API不可用时自动切换到本地/基础模式
+- **真实模式**：使用OpenAI GPT-3.5-turbo进行专业文本润色
+- **模拟模式**：使用预设模板进行文本增强
+- **自动降级**：API不可用时自动切换到模拟模式
 
 ### 图片生成功能
-- **真实图片模式**：Pexels（免费，推荐）→ 在 `.env` 配置 `PEXELS_API_KEY`
-- **生成式图片模式**：百度文心一格（`BAIDU_API_KEY`/`BAIDU_SECRET_KEY`）或通义万相（`DASHSCOPE_API_KEY`）
-- **模拟模式**：Picsum 随机图
-- **智能选择**：优先 Pexels → 百度/通义 → 模拟
-
-### 环境变量示例
-在项目根目录创建 `.env`（未提交到版本库）：
-```env
-# 后端端口（可选）
-PORT=3000
-
-# 文本润色
-ZHIPU_API_KEY=your_zhipu_api_key_here
-DASHSCOPE_API_KEY=your_dashscope_api_key_here
-
-# 图片
-PEXELS_API_KEY=your_pexels_api_key_here
-BAIDU_API_KEY=your_baidu_api_key_here
-BAIDU_SECRET_KEY=your_baidu_secret_key_here
-```
-
-前端可通过 `vue/.env` 指定后端地址：
-```env
-VITE_API_BASE_URL=http://localhost:3000
-```
+- **Unsplash模式**：使用Unsplash API获取高质量真实图片（免费）
+- **DALL-E模式**：使用OpenAI DALL-E生成AI艺术图片
+- **模拟模式**：使用Picsum提供的随机图片
+- **智能选择**：优先使用免费的Unsplash，然后是DALL-E，最后是模拟数据
 
 ## 💡 开发说明
 
